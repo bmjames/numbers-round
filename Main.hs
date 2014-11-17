@@ -30,7 +30,7 @@ solveCmd = info (helper <*> parser) (progDesc "Solve a numbers round with predef
                                           <> help "Number tiles" ))
 
 playCmd :: ParserInfo Options
-playCmd = info (helper <*> (Play <$ pure ())) $ progDesc "Play a game interactively"
+playCmd = info (helper <*> pure Play) $ progDesc "Play a game interactively"
 
 parseOptions :: Parser Options
 parseOptions = subparser (command "solve" solveCmd <> command "play" playCmd)
@@ -68,17 +68,20 @@ genExprs = subsequences >=> filter (not . null) . permutations >=> go
   where
     go :: [Int] -> [Expr]
     go [n]    = [Value n]
-    go (n:ns) = do (op, commutes) <- [(Add, True), (Sub, False), (Mul, True), (Div, False)]
-                   lhs <- go ns
-                   f   <- if commutes then [id] else [id, flip]
-                   return $ f op lhs (Value n)
+    go (n:ns) = do l <- go ns
+                   (op, commutes) <- ops
+                   f <- if commutes then [id] else [id, flip]
+                   return $ f op l (Value n)
+
+    ops = [(Add, True), (Sub, False), (Mul, True), (Div, False)]
 
 solve :: Int -> [Int] -> (Expr, Int)
-solve target = minByAbs ((target -) . snd) . mapMaybe (\a -> (a,) <$> eval a) . genExprs
+solve target =
+    minByAbs ((target -) . snd) . mapMaybe (\a -> (a,) <$> eval a) . genExprs
 
 hPutStrLnColor :: Handle -> [SGR] -> String -> IO ()
 hPutStrLnColor h sgrs t =
-  hSetSGR h sgrs >> hPutStrLn h t >> hSetSGR h []
+    hSetSGR h sgrs >> hPutStrLn h t >> hSetSGR h []
 
 putStrLnColor :: [SGR] -> String -> IO ()
 putStrLnColor = hPutStrLnColor stdout
