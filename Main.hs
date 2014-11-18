@@ -19,24 +19,25 @@ import System.Random.Shuffle    (shuffleM)
 
 data Options = Play | Solve Int [Int]
 
-solveCmd :: ParserInfo Options
-solveCmd = info (helper <*> parser) (progDesc "Solve a numbers round with predefined input")
+options :: ParserInfo Options
+options = info (helper <*> parseOptions) fullDesc
   where
-    parser = Solve <$> option auto ( short 't'
-                                  <> long "target"
-                                  <> metavar "NUMBER"
-                                  <> help "Target number" )
-                   <*> some (argument auto ( metavar "NUMBER..."
-                                          <> help "Number tiles" ))
+    parseOptions :: Parser Options
+    parseOptions = subparser $ command "solve" solveCmd <> command "play" playCmd
 
-playCmd :: ParserInfo Options
-playCmd = info (helper <*> pure Play) $ progDesc "Play a game interactively"
+    playCmd :: ParserInfo Options
+    playCmd = info (helper <*> pure Play) $ progDesc "Play a game interactively"
 
-parseOptions :: Parser Options
-parseOptions = subparser (command "solve" solveCmd <> command "play" playCmd)
+    solveCmd :: ParserInfo Options
+    solveCmd = info (helper <*> parseSolve) $ progDesc "Solve with predefined input"
 
-parserInfo :: ParserInfo Options
-parserInfo = info (helper <*> parseOptions) fullDesc
+    parseSolve :: Parser Options
+    parseSolve = Solve <$> option auto ( short 't'
+                                      <> long "target"
+                                      <> metavar "NUMBER"
+                                      <> help "Target number" )
+                       <*> some (argument auto ( metavar "NUMBER..."
+                                              <> help "Number tiles" ))
 
 data Expr = Value Int
           | Add Expr Expr
@@ -52,16 +53,22 @@ instance Show Expr where
                         Mul l r -> [show l, "×", show r]
                         Div l r -> [show l, "÷", show r]
 
-eval :: Expr -> Maybe Int
-eval (Value i)   = Just i
-eval (Add l r) = (+) <$> eval l <*> eval r
-eval (Sub l r) = (-) <$> eval l <*> eval r
-eval (Mul l r) = (*) <$> eval l <*> eval r
-eval (Div l r) = do denom <- eval r
-                    guard $ denom /= 0
-                    numer <- eval l
-                    let x = numer % denom
-                    if denominator x == 1 then Just (numerator x) else Nothing
+eval :: Bool
+     -- ^ Whether to allow negative values after subtraction
+     -> Expr -> Maybe Int
+eval allowNeg = go where
+    go expr = case expr of
+        Value i -> Just i
+        Add l r -> (+) <$> go l <*> go r
+        Sub l r -> do x <- (-) <$> go l <*> go r
+                      guard $ x >= 0 || allowNeg
+                      return x
+        Mul l r -> (*) <$> go l <*> go r
+        Div l r -> do denom <- go r
+                      guard $ denom /= 0
+                      numer <- go l
+                      let x = numer % denom
+                      if denominator x == 1 then Just (numerator x) else Nothing
 
 genExprs :: [Int] -> [Expr]
 genExprs = subsequences >=> filter (not . null) . permutations >=> go
@@ -77,7 +84,7 @@ genExprs = subsequences >=> filter (not . null) . permutations >=> go
 
 solve :: Int -> [Int] -> (Expr, Int)
 solve target =
-    minByAbs ((target -) . snd) . mapMaybe (\a -> (a,) <$> eval a) . genExprs
+    minByAbs ((target -) . snd) . mapMaybe (\a -> (a,) <$> eval False a) . genExprs
 
 hPutStrLnColor :: Handle -> [SGR] -> String -> IO ()
 hPutStrLnColor h sgrs t =
@@ -120,6 +127,7 @@ play =
     wait solution >>= printSolution target
 
   where
+    askNLarge :: IO Int
     askNLarge = do putStrLn "How many large numbers?"
                    nLarge <- read <$> getLine
                    if not (inRange (0, 4) nLarge)
@@ -128,7 +136,7 @@ play =
 
 main :: IO ()
 main = do
-    opts <- execParser parserInfo
+    opts <- execParser options
     case opts of
         Play -> play
         Solve t ns -> printSolution t $ solve t ns
