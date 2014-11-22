@@ -116,7 +116,7 @@ play =
     nLarge <- askNLarge
     let nSmall = 6 - nLarge
     ns <- (++) <$> (take nLarge <$> shuffleM [25, 50, 75, 100])
-               <*> replicateM nSmall (randomRIO (1, 10))
+               <*> (take nSmall <$> shuffleM (dup [1..10]))
     target   <- randomRIO (100, 999)
     solution <- async $ return $! solve target ns
 
@@ -133,6 +133,8 @@ play =
                    if not (inRange (0, 4) nLarge)
                      then fail "Choose between 0 and 4 large numbers."
                      else return nLarge
+
+    dup a = a <> a
 
 main :: IO ()
 main = do
