@@ -39,73 +39,52 @@ options = info (helper <*> parseOptions) fullDesc
                        <*> some (argument auto ( metavar "NUMBER..."
                                               <> help "Number tiles" ))
 
-newtype Fix f = Fx (f (Fix f))
+data Expr = Lit Int
+          | Add Expr Expr
+          | Sub Expr Expr
+          | Mul Expr Expr
+          | Div Expr Expr
 
-type Algebra f a = f a -> a
-
-unFix :: Fix f -> f (Fix f)
-unFix (Fx x) = x
-
-data ExprF a = Lit Int
-             | Add a a
-             | Sub a a
-             | Mul a a
-             | Div a a
-
-type Expr = Fix ExprF
-
-instance Functor ExprF where
-    fmap _ (Lit i)   = Lit i
-    fmap f (Add l r) = Add (f l) (f r)
-    fmap f (Sub l r) = Sub (f l) (f r)
-    fmap f (Mul l r) = Mul (f l) (f r)
-    fmap f (Div l r) = Div (f l) (f r)
-
-showExpr :: Expr -> String
-showExpr = alg . fmap showExpr . unFix
-  where
-    alg :: Algebra ExprF String
-    alg (Lit i)   = show i
-    alg (Add l r) = showNode [l, "+", r]
-    alg (Sub l r) = showNode [l, "-", r]
-    alg (Mul l r) = showNode [l, "×", r]
-    alg (Div l r) = showNode [l, "÷", r]
-
-    showNode xs = "(" ++ unwords xs ++ ")"
+instance Show Expr where
+    show expr =
+      case expr of
+        Lit i -> show i
+        Add l r -> showNode l r "+"
+        Sub l r -> showNode l r "-"
+        Mul l r -> showNode l r "×"
+        Div l r -> showNode l r "÷"
+      where
+        showNode l r op = "(" ++ unwords [show l, op, show r] ++ ")"
 
 eval :: Bool
      -- ^ Whether to allow negative values after subtraction
      -> Expr -> Maybe Int
-eval allowNeg = eval'
+eval allowNeg = go
   where
-    eval' = alg . fmap eval' . unFix
-
-    alg :: Algebra ExprF (Maybe Int)
-    alg (Lit i)   = Just i
-    alg (Add l r) = liftA2 (+) l r
-    alg (Sub l r) = do x <- liftA2 (-) l r
-                       guard $ x >= 0 || allowNeg
-                       return x
-    alg (Mul l r) = liftA2 (*) l r
-    alg (Div l r) = do denom <- r
-                       guard $ denom /= 0
-                       numer <- l
-                       let x = numer % denom
-                       if denominator x == 1 then Just (numerator x) else Nothing
+    go (Lit i)   = Just i
+    go (Add l r) = liftA2 (+) (go l) (go r)
+    go (Sub l r) = do x <- liftA2 (-) (go l) (go r)
+                      guard $ x >= 0 || allowNeg
+                      return x
+    go (Mul l r) = liftA2 (*) (go l) (go r)
+    go (Div l r) = do denom <- go r
+                      guard $ denom /= 0
+                      numer <- go l
+                      let x = numer % denom
+                      if denominator x == 1 then Just (numerator x) else Nothing
 
 genExprs :: [Int] -> [Expr]
 genExprs ns = subsequences ns >>= permutations >>= go
   where
     go :: [Int] -> [Expr]
     go []  = []
-    go [n] = [lit n]
+    go [n] = [Lit n]
     go ns' = do (ls, rs) <- spans ns'
                 l <- go ls
                 r <- go rs
                 op <- ops
-                return $ Fx $ op l r
+                return $ op l r
 
-    lit = Fx . Lit
     ops = [Add, Sub, Mul, Div]
 
 spans :: [a] -> [([a], [a])]
@@ -132,7 +111,7 @@ minByAbs _ [] = error "minByAbs on empty list"
 
 printSolution :: Int -> (Expr, Int) -> IO ()
 printSolution target (expr, i) =
-    putStrLnColor [color] $ unwords [showExpr expr, "=", show i]
+    putStrLnColor [color] $ unwords [show expr, "=", show i]
 
   where
     color = if i == target then green else yellow
