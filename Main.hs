@@ -2,11 +2,11 @@
 
 module Main where
 
-import Control.Monad            ((>=>), guard)
+import Control.Monad            (guard)
 import Control.Concurrent.Async (async, wait)
 
 import Data.Ix                  (inRange)
-import Data.List                (permutations, subsequences)
+import Data.List
 import Data.Maybe               (mapMaybe)
 import Data.Ratio
 
@@ -94,16 +94,22 @@ eval allowNeg = eval'
                        if denominator x == 1 then Just (numerator x) else Nothing
 
 genExprs :: [Int] -> [Expr]
-genExprs = subsequences >=> filter (not . null) . permutations >=> go
+genExprs ns = subsequences ns >>= permutations >>= go
   where
     go :: [Int] -> [Expr]
-    go [n]    = [Fx $ Lit n]
-    go (n:ns) = do l <- go ns
-                   (op, commutes) <- ops
-                   f <- if commutes then [id] else [id, flip]
-                   return $ Fx $ f op l $ Fx $ Lit n
+    go []  = []
+    go [n] = [lit n]
+    go ns' = do (ls, rs) <- spans ns'
+                l <- go ls
+                r <- go rs
+                op <- ops
+                return $ Fx $ op l r
 
-    ops = [(Add, True), (Sub, False), (Mul, True), (Div, False)]
+    lit = Fx . Lit
+    ops = [Add, Sub, Mul, Div]
+
+spans :: [a] -> [([a], [a])]
+spans xs = tail $ init $ zip (inits xs) (tails xs)
 
 solve :: Int -> [Int] -> (Expr, Int)
 solve target =
