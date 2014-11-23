@@ -46,15 +46,17 @@ data Expr = Lit Int
           | Div Expr Expr
 
 instance Show Expr where
-    show expr =
+    showsPrec p expr =
       case expr of
-        Lit i -> show i
-        Add l r -> showNode l r "+"
-        Sub l r -> showNode l r "-"
-        Mul l r -> showNode l r "×"
-        Div l r -> showNode l r "÷"
+        Lit i   -> showString (show i)
+        Add l r -> showExpr l r "+" (0, 0, 1)
+        Sub l r -> showExpr l r "-" (0, 0, 1)
+        Mul l r -> showExpr l r "×" (1, 1, 2)
+        Div l r -> showExpr l r "÷" (1, 1, 2)
       where
-        showNode l r op = "(" ++ unwords [show l, op, show r] ++ ")"
+        showExpr l r op (ql, q, qr) =
+            showParen (p > q) (showsPrec ql l . pad ' ' op . showsPrec qr r)
+        pad delim s = showChar delim . showString s . showChar delim
 
 eval :: Bool
      -- ^ Whether to allow negative values after subtraction
