@@ -49,13 +49,13 @@ instance Show Expr where
     showsPrec p expr =
       case expr of
         Lit i   -> showString (show i)
-        Add l r -> showExpr l r "+" (0, 0, 1)
-        Sub l r -> showExpr l r "-" (0, 0, 1)
-        Mul l r -> showExpr l r "×" (1, 1, 2)
-        Div l r -> showExpr l r "÷" (1, 1, 2)
+        Add l r -> showExpr l r "+" (0, 1)
+        Sub l r -> showExpr l r "-" (0, 1)
+        Mul l r -> showExpr l r "×" (1, 2)
+        Div l r -> showExpr l r "÷" (1, 2)
       where
-        showExpr l r op (ql, q, qr) =
-            showParen (p > q) (showsPrec ql l . pad ' ' op . showsPrec qr r)
+        showExpr l r op (ql, qr) =
+            showParen (p > ql) (showsPrec ql l . pad ' ' op . showsPrec qr r)
         pad delim s = showChar delim . showString s . showChar delim
 
 eval :: Bool
