@@ -111,9 +111,20 @@ minByAbs f (x:xs) = go x xs where
                      else go (if fm < abs (f x) then m else x) xs
 minByAbs _ [] = error "minByAbs on empty list"
 
+normalise :: Expr -> Expr
+normalise (Lit i)            = Lit i
+normalise (Add l (Add l' r)) = normalise $ Add (Add l l') r
+normalise (Add l r)          = Add (normalise l) (normalise r)
+normalise (Sub l (Add l' r)) = normalise $ Sub (Sub l l') r
+normalise (Sub l r)          = Sub (normalise l) (normalise r)
+normalise (Mul l (Mul l' r)) = normalise $ Mul (Mul l l') r
+normalise (Mul l r)          = Mul (normalise l) (normalise r)
+normalise (Div l (Mul l' r)) = normalise $ Div (Div l l') r
+normalise (Div l r)          = Div (normalise l) (normalise r)
+
 printSolution :: Int -> (Expr, Int) -> IO ()
 printSolution target (expr, i) =
-    putStrLnColor [color] $ unwords [show expr, "=", show i]
+    putStrLnColor [color] $ unwords [show (normalise expr), "=", show i]
 
   where
     color = if i == target then green else yellow
