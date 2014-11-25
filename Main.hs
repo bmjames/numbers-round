@@ -18,7 +18,7 @@ import System.IO
 import System.Random            (randomRIO)
 import System.Random.Shuffle    (shuffleM)
 
-data Options = Play | Solve Int [Int]
+data Options = Play (Maybe Int) | Solve Int [Int]
 
 options :: ParserInfo Options
 options = info (helper <*> parseOptions) fullDesc
@@ -27,10 +27,16 @@ options = info (helper <*> parseOptions) fullDesc
     parseOptions = subparser $ command "solve" solveCmd <> command "play" playCmd
 
     playCmd :: ParserInfo Options
-    playCmd = info (helper <*> pure Play) $ progDesc "Play a game interactively"
+    playCmd = info (helper <*> parsePlay) $ progDesc "Play a game interactively"
 
     solveCmd :: ParserInfo Options
     solveCmd = info (helper <*> parseSolve) $ progDesc "Solve with predefined input"
+
+    parsePlay :: Parser Options
+    parsePlay = Play <$> optional (option auto ( short 'l'
+                                              <> long "large"
+                                              <> metavar "COUNT"
+                                              <> help "Number of \"large\" numbers" ))
 
     parseSolve :: Parser Options
     parseSolve = Solve <$> option auto ( short 't'
@@ -137,10 +143,10 @@ printSolution target (expr, i) =
     green  = SetColor Foreground Dull Green
     yellow = SetColor Foreground Dull Yellow
 
-play :: IO ()
-play =
+play :: Maybe Int -> IO ()
+play maybeNLarge =
   do
-    nLarge <- askNLarge
+    nLarge <- maybe askNLarge return maybeNLarge
     let nSmall = 6 - nLarge
     ns <- (++) <$> (take nLarge <$> shuffleM [25, 50, 75, 100])
                <*> (take nSmall <$> shuffleM (dup [1..10]))
@@ -167,5 +173,5 @@ main :: IO ()
 main = do
     opts <- execParser options
     case opts of
-        Play -> play
+        Play l -> play l
         Solve t ns -> printSolution t $ solve t ns
