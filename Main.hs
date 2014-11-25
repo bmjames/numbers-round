@@ -2,8 +2,9 @@
 
 module Main where
 
-import Control.Monad            (guard)
+import Control.Monad            ((>=>), guard)
 import Control.Concurrent.Async (async, wait)
+import Control.Parallel.Strategies
 
 import Data.Ix                  (inRange)
 import Data.List
@@ -75,8 +76,13 @@ eval allowNeg = go
                       let x = numer % denom
                       if denominator x == 1 then Just (numerator x) else Nothing
 
-genExprs :: [Int] -> [Expr]
-genExprs ns = subsequences ns >>= permutations >>= go
+solve :: Int -> [Int] -> (Expr, Int)
+solve t =  closest
+         . withStrategy (parBuffer 50 rseq)
+         . map (closest . mapMaybe withValue . go)
+         . filter (not . null)
+         . (subsequences >=> permutations)
+
   where
     go :: [Int] -> [Expr]
     go []  = []
@@ -88,13 +94,11 @@ genExprs ns = subsequences ns >>= permutations >>= go
                 return $ op l r
 
     ops = [Add, Sub, Mul, Div]
+    withValue a = (a,) <$> eval False a
+    closest = minByAbs ((t -) . snd)
 
 spans :: [a] -> [([a], [a])]
 spans xs = tail $ init $ zip (inits xs) (tails xs)
-
-solve :: Int -> [Int] -> (Expr, Int)
-solve target =
-    minByAbs ((target -) . snd) . mapMaybe (\a -> (a,) <$> eval False a) . genExprs
 
 hPutStrLnColor :: Handle -> [SGR] -> String -> IO ()
 hPutStrLnColor h sgrs t =
