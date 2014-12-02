@@ -1,5 +1,3 @@
-{-# LANGUAGE TupleSections #-}
-
 module Main where
 
 import Control.Monad            ((>=>), guard)
@@ -51,6 +49,7 @@ data Expr = Lit Int
           | Sub Expr Expr
           | Mul Expr Expr
           | Div Expr Expr
+          deriving Eq
 
 instance Show Expr where
     showsPrec p expr =
@@ -85,26 +84,30 @@ eval allowNeg = go
 solve :: Int -> [Int] -> (Expr, Int)
 solve t =  closest
          . withStrategy (parBuffer 50 rseq)
-         . map (closest . mapMaybe withValue . go)
+         . map (closest . mapMaybe withValue . genExprs)
          . filter (not . null)
          . (subsequences >=> permutations)
 
   where
-    go :: [Int] -> [Expr]
-    go []  = []
-    go [n] = [Lit n]
-    go ns' = do (ls, rs) <- spans ns'
-                l <- go ls
-                r <- go rs
-                op <- ops
-                return $ op l r
+    withValue a = (,) a <$> eval False a
 
-    ops = [Add, Sub, Mul, Div]
-    withValue a = (a,) <$> eval False a
     closest = minByAbs ((t -) . snd)
 
-spans :: [a] -> [([a], [a])]
-spans xs = tail $ init $ zip (inits xs) (tails xs)
+-- | Generate all expression trees using the inputs in order to create leaves
+genExprs :: [Int] -> [Expr]
+genExprs []  = []
+genExprs [n] = [Lit n]
+genExprs ns  = do (ls, rs) <- spans ns
+                  l        <- genExprs ls
+                  r        <- genExprs rs
+                  op       <- ops
+                  return $ op l r
+
+  where
+    ops = [Add, Sub, Mul, Div]
+
+    spans :: [a] -> [([a], [a])]
+    spans xs = tail $ init $ zip (inits xs) (tails xs)
 
 hPutStrLnColor :: Handle -> [SGR] -> String -> IO ()
 hPutStrLnColor h sgrs t =
