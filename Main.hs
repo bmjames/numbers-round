@@ -89,9 +89,10 @@ solve t =  closest
          . (subsequences >=> permutations)
 
   where
-    withValue a = (,) a <$> eval False a
-
     closest = minByAbs ((t -) . snd)
+
+withValue :: Expr -> Maybe (Expr, Int)
+withValue a = (,) a <$> eval False a
 
 -- | Generate all expression trees using the inputs in order to create leaves
 genExprs :: [Int] -> [Expr]
@@ -100,14 +101,11 @@ genExprs [n] = [Lit n]
 genExprs ns  = do (ls, rs) <- spans ns
                   l        <- genExprs ls
                   r        <- genExprs rs
-                  op       <- ops
+                  op       <- [Add, Sub, Mul, Div]
                   return $ op l r
 
-  where
-    ops = [Add, Sub, Mul, Div]
-
-    spans :: [a] -> [([a], [a])]
-    spans xs = tail $ init $ zip (inits xs) (tails xs)
+spans :: [a] -> [([a], [a])]
+spans xs = tail $ init $ zip (inits xs) (tails xs)
 
 hPutStrLnColor :: Handle -> [SGR] -> String -> IO ()
 hPutStrLnColor h sgrs t =
