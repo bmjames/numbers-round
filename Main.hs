@@ -164,9 +164,9 @@ play maybeNLarge =
     askNLarge :: IO Int
     askNLarge = do putStrLn "How many large numbers?"
                    nLarge <- read <$> getLine
-                   if not (inRange (0, 4) nLarge)
-                     then fail "Choose between 0 and 4 large numbers."
-                     else return nLarge
+                   if inRange (0, 4) nLarge
+                     then return nLarge
+                     else fail "Choose between 0 and 4 large numbers."
 
     dup a = a <> a
 
