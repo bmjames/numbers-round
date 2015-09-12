@@ -64,22 +64,18 @@ instance Show Expr where
             showParen (p > ql) (showsPrec ql l . pad ' ' op . showsPrec qr r)
         pad delim s = showChar delim . showString s . showChar delim
 
-eval :: Bool
-     -- ^ Whether to allow negative values after subtraction
-     -> Expr -> Maybe Int
-eval allowNeg = go
-  where
-    go (Lit i)   = Just i
-    go (Add l r) = liftA2 (+) (go l) (go r)
-    go (Sub l r) = do x <- liftA2 (-) (go l) (go r)
-                      guard $ x >= 0 || allowNeg
-                      return x
-    go (Mul l r) = liftA2 (*) (go l) (go r)
-    go (Div l r) = do denom <- go r
-                      guard $ denom /= 0
-                      numer <- go l
-                      let x = numer % denom
-                      if denominator x == 1 then Just (numerator x) else Nothing
+eval :: Expr -> Maybe Int
+eval (Lit i)   = Just i
+eval (Add l r) = liftA2 (+) (eval l) (eval r)
+eval (Sub l r) = do x <- liftA2 (-) (eval l) (eval r)
+                    guard $ x >= 0
+                    return x
+eval (Mul l r) = liftA2 (*) (eval l) (eval r)
+eval (Div l r) = do denom <- eval r
+                    guard $ denom /= 0
+                    numer <- eval l
+                    let x = numer % denom
+                    if denominator x == 1 then Just (numerator x) else Nothing
 
 solve :: Int -> [Int] -> (Expr, Int)
 solve t =  closest
@@ -92,7 +88,7 @@ solve t =  closest
     closest = minByAbs ((t -) . snd)
 
 withValue :: Expr -> Maybe (Expr, Int)
-withValue a = (,) a <$> eval False a
+withValue a = (,) a <$> eval a
 
 -- | Generate all expression trees using the inputs in order to create leaves
 genExprs :: [Int] -> [Expr]
