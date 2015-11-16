@@ -77,6 +77,9 @@ eval (Div l r) = do denom <- eval r
                     let x = numer % denom
                     if denominator x == 1 then Just (numerator x) else Nothing
 
+operators :: [Expr -> Expr -> Expr]
+operators = [Add, Sub, Mul, Div]
+
 solve :: Int -> [Int] -> (Expr, Int)
 solve t =  closest
          . withStrategy (parBuffer 50 rseq)
@@ -97,7 +100,7 @@ genExprs [n] = [Lit n]
 genExprs ns  = do (ls, rs) <- spans ns
                   l        <- genExprs ls
                   r        <- genExprs rs
-                  op       <- [Add, Sub, Mul, Div]
+                  op       <- operators
                   return $ op l r
 
 spans :: [a] -> [([a], [a])]
@@ -119,17 +122,18 @@ minByAbs f (x:xs) = go x xs where
 minByAbs _ [] = error "minByAbs on empty list"
 
 normalise :: Expr -> Expr
-normalise (Lit i)            = Lit i
-normalise (Add l (Add l' r)) = normalise $ Add (Add l l') r
-normalise (Add l (Sub l' r)) = normalise $ Sub (Add l l') r
-normalise (Add l r)          = Add (normalise l) (normalise r)
-normalise (Sub l (Add l' r)) = normalise $ Sub (Sub l l') r
-normalise (Sub l r)          = Sub (normalise l) (normalise r)
-normalise (Mul l (Mul l' r)) = normalise $ Mul (Mul l l') r
-normalise (Mul l (Div l' r)) = normalise $ Div (Mul l l') r
-normalise (Mul l r)          = Mul (normalise l) (normalise r)
-normalise (Div l (Mul l' r)) = normalise $ Div (Div l l') r
-normalise (Div l r)          = Div (normalise l) (normalise r)
+normalise expr = case expr of
+  Lit i            -> Lit i
+  Add l (Add l' r) -> normalise $ Add (Add l l') r
+  Add l (Sub l' r) -> normalise $ Sub (Add l l') r
+  Add l r          -> Add (normalise l) (normalise r)
+  Sub l (Add l' r) -> normalise $ Sub (Sub l l') r
+  Sub l r          -> Sub (normalise l) (normalise r)
+  Mul l (Mul l' r) -> normalise $ Mul (Mul l l') r
+  Mul l (Div l' r) -> normalise $ Div (Mul l l') r
+  Mul l r          -> Mul (normalise l) (normalise r)
+  Div l (Mul l' r) -> normalise $ Div (Div l l') r
+  Div l r          -> Div (normalise l) (normalise r)
 
 printSolution :: Int -> (Expr, Int) -> IO ()
 printSolution target (expr, i) =
